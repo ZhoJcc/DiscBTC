@@ -1,3 +1,4 @@
+
 const { SlashCommandBuilder, PermissionsBitField, ChannelType } = require('discord.js');
 const blockcypher = require('../blockcypher');
 const db = require('../db');
@@ -54,21 +55,10 @@ module.exports = {
         });
 
         // Generate unique BTC address
-        const btcAddress = await blockcypher.generateAddress();
+        const btcAddress = await blockcypher.generateAddress(user.id);
         if (!btcAddress) {
             return interaction.reply({ content: 'Failed to generate a BTC address. Please try again later.', ephemeral: true });
         }
-
-        // Save the BTC address in the database
-        db.run(
-            'INSERT INTO transactions (discord_id, btc_address) VALUES (?, ?)',
-            [user.id, btcAddress],
-            (err) => {
-                if (err) {
-                    console.error('Error saving BTC address:', err);
-                }
-            }
-        );
 
         // Send ticket creation message with BTC address
         await ticketChannel.send(

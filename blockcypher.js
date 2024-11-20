@@ -8,7 +8,7 @@ const BLOCKCYPHER_TOKEN = process.env.BLOCKCYPHER_TOKEN;
 module.exports = {
     async generateAddress(discordId) {
         if (!discordId) {
-            console.error('Error: discordId is undefined.');
+            console.error('Error: discordId is undefined. Ensure the user ID is passed to the function.');
             return null;
         }
 
@@ -44,6 +44,18 @@ module.exports = {
             return btcAddress;
         } catch (error) {
             console.error('Error generating BTC address:', error);
+            return null;
+        }
+    },
+
+    async getBtcPriceInUsd() {
+        try {
+            const response = await axios.get('https://api.coindesk.com/v1/bpi/currentprice/BTC.json');
+            const price = parseFloat(response.data.bpi.USD.rate.replace(',', ''));
+            console.log(`Current BTC price in USD: $${price}`);
+            return price;
+        } catch (error) {
+            console.error('Error fetching BTC price:', error);
             return null;
         }
     },
