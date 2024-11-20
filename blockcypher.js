@@ -7,46 +7,41 @@ const BLOCKCYPHER_TOKEN = process.env.BLOCKCYPHER_TOKEN;
 
 module.exports = {
     async generateAddress(discordId) {
-        try {
-            // Check if a BTC address already exists for the user
-            const existingAddress = await new Promise((resolve, reject) => {
-                db.get('SELECT btc_address FROM transactions WHERE discord_id = ?', [discordId], (err, row) => {
-                    if (err) reject(err);
-                    else resolve(row ? row.btc_address : null);
-                });
+        if (!discordId) {
+            console.error('Error: discordId is undefined.');
+            return null;
+        }
+
+        // Check if BTC address already exists for the user
+        const existingAddress = await new Promise((resolve, reject) => {
+            db.get('SELECT btc_address FROM transactions WHERE discord_id = ?', [discordId], (err, row) => {
+                if (err) reject(err);
+                else resolve(row ? row.btc_address : null);
             });
+        });
 
-            if (existingAddress) {
-                console.log(`Using cached BTC address for user ${discordId}: ${existingAddress}`);
-                return existingAddress;
-            }
+        if (existingAddress) {
+            console.log(`Using cached BTC address for user ${discordId}: ${existingAddress}`);
+            return existingAddress;
+        }
 
-            const MAX_RETRIES = 3;
-            let attempt = 0;
+        try {
+            const response = await axios.post(`${BLOCKCYPHER_BASE_URL}/addrs?token=${BLOCKCYPHER_TOKEN}`);
+            const btcAddress = response.data.address;
 
-            while (attempt < MAX_RETRIES) {
-                try {
-                    const response = await axios.post(`${BLOCKCYPHER_BASE_URL}/addrs?token=${BLOCKCYPHER_TOKEN}`);
-                    const btcAddress = response.data.address;
-
-                    // Cache the new address in the database
-                    db.run('INSERT INTO transactions (discord_id, btc_address) VALUES (?, ?)', [discordId, btcAddress]);
-
-                    console.log(`Generated new BTC address for user ${discordId}: ${btcAddress}`);
-                    return btcAddress;
-                } catch (error) {
-                    if (error.response?.status === 429) {
-                        console.error(`Rate limit exceeded. Retrying in ${2 ** attempt} seconds...`);
-                        await new Promise(resolve => setTimeout(resolve, 2 ** attempt * 1000));
-                        attempt++;
-                    } else {
-                        throw error;
+            // Insert into database
+            db.run(
+                'INSERT INTO transactions (discord_id, btc_address) VALUES (?, ?)',
+                [discordId, btcAddress],
+                (err) => {
+                    if (err) {
+                        console.error('Database insert error:', err);
                     }
                 }
-            }
+            );
 
-            console.error('Failed to generate BTC address after retries.');
-            return null;
+            console.log(`Generated new BTC address for user ${discordId}: ${btcAddress}`);
+            return btcAddress;
         } catch (error) {
             console.error('Error generating BTC address:', error);
             return null;
